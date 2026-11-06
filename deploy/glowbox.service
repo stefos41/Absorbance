@@ -1,0 +1,14 @@
+# Copy to /etc/systemd/system/glowbox.service, replace YOUR_USER, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now glowbox
+[Unit]
+Description=GlowBox absorbance strip reader
+After=multi-user.target
+
+[Service]
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/Absorbance/glowbox
+ExecStart=/usr/bin/python3 /home/YOUR_USER/Absorbance/glowbox/glowbox.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

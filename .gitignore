@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+glowbox/glowbox_data/
+.venv/
+.DS_Store

@@ -1,0 +1,3 @@
+# For running the hardware-free simulations (tests/run_all.sh) on any computer
+numpy
+pillow
