@@ -62,6 +62,15 @@ BG_GAP_PX = 6             # gap between line band and background bands (skips bl
 BG_WIDTH_PX = 15          # width of the clean-paper background band on EACH side
 SMOOTH_PX = 3             # moving-average smoothing of the brightness profile
 
+# Where along the strip to look for the line, as fractions of the measuring box:
+# 0.0 = top end (lines running left-right) or left end (lines running up-down).
+# (0.20, 1.0) skips the first 20% at the holder end, where the L-holder's edge and
+# shadow look like a line. Draw marker lines away from that end.
+LINE_SEARCH = (0.20, 1.0)
+# Reject "lines" whose paper above and below differs by more than this fraction
+# (edges and shadows have paper on one side only). 1.0 = check off.
+BG_MAX_MISMATCH = 0.30
+
 # ---------------- Image quality checks ----------------
 MIN_PAPER_LEVEL = 30      # paper brightness (above dark) below this -> "TOO DARK"
 SATURATION_FRACTION = 0.92  # any ROI pixel above this fraction of full scale -> "TOO BRIGHT"

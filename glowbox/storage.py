@@ -65,7 +65,8 @@ def fmt(x, digits=4):
 
 def save_debug_image(cfg, red_image, result, path):
     """Grey picture of the red channel. Yellow = measuring box, cyan = line found,
-    magenta = whole strip, red = other bright spots (e.g. an LED visible to the camera)."""
+    magenta = whole strip, red = other bright spots (e.g. an LED visible to the camera),
+    orange = start/end of the line search."""
     from PIL import Image, ImageDraw
 
     img = np.asarray(red_image, dtype=np.float64)
@@ -86,6 +87,14 @@ def save_debug_image(cfg, red_image, result, path):
         return
     y0, y1, x0, x1 = result["roi_px"]
     draw.rectangle([x0, y0, x1 - 1, y1 - 1], outline=(255, 220, 0), width=2)
+
+    si = result.get("search_idx")
+    if si:   # orange marks where the line search starts and ends
+        for k in si:
+            if result.get("orientation") == "horizontal":
+                draw.line([x0, y0 + k, x1 - 1, y0 + k], fill=(255, 140, 0), width=1)
+            else:
+                draw.line([x0 + k, y0, x0 + k, y1 - 1], fill=(255, 140, 0), width=1)
 
     c = result.get("line_index")
     if c is not None:

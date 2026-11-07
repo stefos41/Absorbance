@@ -10,7 +10,7 @@ rng = np.random.default_rng(0)
 H, W, FS, BLACK = 648, 1152, 1023, 64.0
 
 
-def strip_image(line_abs, layout="tall", paper=500.0, line_frac=0.3, glare=False, grad=True, uneven=False):
+def strip_image(line_abs, layout="tall", paper=500.0, line_frac=0.3, glare=False, grad=True, uneven=False, holder=False):
     """Dark background, a bright strip, a dark line across it. Returns (sample, dark, truth)."""
     img = np.zeros((H, W))
     if layout == "tall":                                 # strip up-down, line left-right
@@ -29,6 +29,10 @@ def strip_image(line_abs, layout="tall", paper=500.0, line_frac=0.3, glare=False
         c = int(line_frac * strip.shape[0]); strip[c-5:c+6, :] *= 10 ** -line_abs
     else:
         c = int(line_frac * strip.shape[1]); strip[:, c-5:c+6] *= 10 ** -line_abs
+    if holder and layout == "tall":                     # L-holder at the top: cardboard, then its shadow
+        n0 = int(0.10 * strip.shape[0])
+        strip[:n0, :] = paper * 0.9 * (1 + 0.15 * rng.standard_normal((n0, strip.shape[1])))
+        strip[n0:n0 + 7, :] *= 0.3
     img[y0:y1, x0:x1] = strip
     if glare:
         yy, xx = np.ogrid[:H, :W]
@@ -60,6 +64,18 @@ for layout in ("tall", "wide"):
         fails += not ok
         print(f"true={true:.3f} measured={r['absorbance'] if r['absorbance'] is None else round(r['absorbance'], 4)}"
               f" whole strip found={whole} {r['status']} {'ok' if ok else 'MISMATCH'}")
+
+print("--- L-holder shadow at the strip end (your setup)")
+for true in [0.0, 0.0, 0.0, 0.05, 0.3, 0.7]:
+    r = analysis.analyze(*strip_image(true, "tall", line_frac=0.4, holder=True), cfg, FS)
+    ok = r["status"] == "OK" and abs(r["absorbance"] - true) < 0.012 + 0.03 * true
+    fails += not ok
+    print(f"true={true:.3f} measured={r['absorbance'] if r['absorbance'] is None else round(r['absorbance'], 4)}"
+          f" line at {r['line_pos']}  {'ok' if ok else 'MISMATCH'}")
+_ls = cfg.LINE_SEARCH; cfg.LINE_SEARCH = (0.0, 1.0)
+r = analysis.analyze(*strip_image(0.0, "tall", holder=True), cfg, FS)
+print(f"(info) both-sides check alone, no search limit: blank reads {r['absorbance']:.4f}")
+cfg.LINE_SEARCH = _ls
 
 blanks = [analysis.analyze(*strip_image(0.0, "wide"), cfg, FS)["absorbance"] for _ in range(10)]
 cal = analysis.compute_threshold(blanks, cfg.CAL_K_SIGMA, cfg.CAL_MIN_DELTA)

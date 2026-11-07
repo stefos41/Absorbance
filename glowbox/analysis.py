@@ -188,7 +188,8 @@ def analyze(sample, dark, cfg, full_scale):
 
     result = {"status": "OK", "absorbance": None, "line_level": None,
               "paper_level": None, "line_pos": None, "profile": None,
-              "line_index": None, "roi_px": None, "orientation": None, "strip": None}
+              "line_index": None, "roi_px": None, "orientation": None, "strip": None,
+              "search_idx": None}
 
     roi_px, orientation, strip = resolve_roi(sample, dark, cfg)
     if roi_px is None:
@@ -233,11 +234,27 @@ def analyze(sample, dark, cfg, full_scale):
     def window_mean(start, length):          # mean of profile[start:start+length] for arrays of start
         return (cs[start + length] - cs[start]) / length
 
-    centres = np.arange(margin, n - margin)
+    # Only search where a line can really be: LINE_SEARCH skips the strip end at the
+    # holder (its edge/shadow looks like a line), as fractions of the measuring box.
+    s0, s1 = getattr(cfg, "LINE_SEARCH", (0.0, 1.0))
+    lo_c = max(margin, int(round(s0 * (n - 1))))
+    hi_c = min(n - margin, int(round(s1 * (n - 1))) + 1)
+    if hi_c <= lo_c:
+        result["status"] = "NO_STRIP"     # search range too small for the line/background widths
+        return result
+    result["search_idx"] = (lo_c, hi_c)
+    centres = np.arange(lo_c, hi_c)
     line_means = window_mean(centres - hw, 2 * hw + 1)
-    bg_means = 0.5 * (window_mean(centres - hw - gap - bgw, bgw)
-                      + window_mean(centres + hw + gap + 1, bgw))
+    bg_a = window_mean(centres - hw - gap - bgw, bgw)
+    bg_b = window_mean(centres + hw + gap + 1, bgw)
+    bg_means = 0.5 * (bg_a + bg_b)
     ratio = np.maximum(line_means, 1e-6) / np.maximum(bg_means, 1e-6)
+    # A real line has similar clean paper on BOTH sides. An edge or a shadow has
+    # paper on one side and something else on the other: skip those positions.
+    agree = np.minimum(bg_a, bg_b) / np.maximum(np.maximum(bg_a, bg_b), 1e-6)
+    ok = agree >= 1.0 - getattr(cfg, "BG_MAX_MISMATCH", 1.0)
+    if np.any(ok):
+        ratio = np.where(ok, ratio, np.inf)
     best = int(np.argmin(ratio))
     c = int(centres[best])
     line_level = float(line_means[best])
