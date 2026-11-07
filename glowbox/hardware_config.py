@@ -28,7 +28,7 @@ LED_MAX_ON_S = 10.0       # watchdog: LEDs are forced off after this many second
 # "raw"  = raw only (most accurate).  "rgb" = normal colour image only (most robust).
 CAM_MODE = "auto"
 # camera_test.py tells you if these need changing (and suggests values).
-CAM_EXPOSURE_US = 100_000  # 100 ms
+CAM_EXPOSURE_US = 50_000  # 50 ms
 CAM_GAIN = 4.0
 CAM_LENS_POSITION = 6.5   # dioptres; 6.5 ~= 15 cm. Tune with bench_measure.py if blurry.
 CAM_RAW_SIZE = (2304, 1296)   # binned sensor mode: fast, low noise
