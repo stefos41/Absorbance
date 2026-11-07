@@ -150,9 +150,16 @@ def main():
             sat = float(lit[y0:y1, x0:x1].max()) >= cfg.SATURATION_FRACTION * cam.full_scale
             pct = 100 * paper / cam.full_scale
             exp, gain = cfg.CAM_EXPOSURE_US, cfg.CAM_GAIN
+            sat_level = cfg.SATURATION_FRACTION * cam.full_scale
+            sat_pct = 100 * float(np.mean(lit[y0:y1, x0:x1] >= sat_level))
             if sat:
+                # aim the brightest unsaturated part (99th percentile) at ~75% of full scale
+                p99 = float(np.percentile(lit_minus_dark[y0:y1, x0:x1], 99))
+                scale = min(0.75 * cam.full_scale / max(p99, 1.0), 0.8) if sat_pct > 1 else 0.8
                 report("WARN", "exposure: TOO BRIGHT (saturated pixels on the strip)",
-                       f"-> try CAM_EXPOSURE_US = {int(exp * 0.5)}")
+                       f"paper ~{pct:.0f}% of full scale, {sat_pct:.2f}% of strip pixels maxed out "
+                       f"-> try CAM_EXPOSURE_US = {int(exp * scale)}"
+                       + ("  (bright hotspots: more even LED light would help)" if sat_pct < 5 and pct < 60 else ""))
             elif pct < 30 or pct > 85:
                 factor = 60 / max(pct, 0.5)
                 new_exp, new_gain = exp * factor, gain
