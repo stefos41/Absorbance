@@ -3,13 +3,17 @@ import numpy as np
 __version__ = "fake"
 STATE = {"led": None, "lag": 2, "since_on": 0, "raw_broken": False,
          "layout": "strip_vertical",   # or "strip_horizontal" (like a strip lying left-right)
-         "glare": False, "paper": 400.0, "line_abs": 0.15}
+         "glare": False, "paper": 400.0, "line_abs": 0.15,
+         "ref_exposure": None, "controls": {}}   # ref_exposure: exposure*gain at which "paper" applies
 
 
 def _scene(lit, h, w, black, scale):
     img = np.full((h, w), float(black))
     if lit:
         paper = STATE["paper"] * scale
+        if STATE["ref_exposure"]:
+            c = STATE["controls"]
+            paper *= c.get("ExposureTime", 1) * c.get("AnalogueGain", 1) / STATE["ref_exposure"]
         if STATE["layout"] == "strip_vertical":          # tall strip, line runs left-right
             y0, y1, x0, x1 = int(.15*h), int(.85*h), int(.42*w), int(.58*w)
             img[y0:y1, x0:x1] += paper
@@ -66,7 +70,9 @@ class Picamera2:
     def global_camera_info():
         return [{"Model": "imx708_noir"}]
 
-    def create_still_configuration(self, **kw): return kw
+    def create_still_configuration(self, **kw):
+        STATE["controls"] = dict(kw.get("controls", {}))
+        return kw
     def configure(self, c): pass
     def start(self): pass
     def stop(self): pass

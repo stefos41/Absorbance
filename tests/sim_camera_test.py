@@ -15,5 +15,7 @@ if "lag6" in sys.argv: picamera2.STATE["lag"] = 6
 if "wide" in sys.argv: picamera2.STATE["layout"] = "strip_horizontal"
 if "glare" in sys.argv: picamera2.STATE["glare"] = True
 if "dim" in sys.argv: picamera2.STATE["paper"] = 12.0
-sys.argv = ["camera_test.py"] + [a for a in sys.argv[1:] if a in ("rgb", "raw")]
+if "hot" in sys.argv:   # too bright at 150 ms x gain 8, brightness follows exposure
+    picamera2.STATE.update(paper=1300.0, ref_exposure=150_000 * 8.0)
+sys.argv = ["camera_test.py"] + [a for a in sys.argv[1:] if a in ("rgb", "raw", "--apply")]
 import camera_test; camera_test.main()

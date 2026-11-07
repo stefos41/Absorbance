@@ -63,7 +63,7 @@ Then: `cd ~/Absorbance/glowbox`. Later updates: `git pull`.
 2. **Camera test:** put a strip or white paper in the holder, close the box, run `python3 camera_test.py`. Fix any WARN/FAIL using the hint it prints. If the camera won't start, try `python3 camera_test.py rgb`; if that works, set `CAM_MODE = "rgb"` in `hardware_config.py`.
 3. **Exposure and strip finding:** put a strip with a marker line in the holder (either direction is fine), close the box, run `python3 bench_measure.py`, then:
    * Type `roi` and open the saved `glowbox_data/photos/roi_debug_*.png`. The code finds the strip by itself: **magenta** = the strip it found, **yellow** = the measuring box, **cyan** = the line it found, **red** = other bright spots (usually an LED the camera can see; shield or re-aim it).
-   * Check the printed **paper level**. Aim for 40–80% of full scale. TOO BRIGHT → lower `CAM_EXPOSURE_US`; TOO DARK → raise it (`camera_test.py` suggests values).
+   * Check the printed **paper level**. Aim for 40–80% of full scale. If `camera_test.py` says TOO BRIGHT or low, run `python3 camera_test.py --apply`: it saves the suggested exposure/gain to `glowbox/local_settings.py` (this Pi only, ignored by git, so `git pull` never conflicts). Run `camera_test.py` again to confirm. Delete `local_settings.py` to go back to the defaults in `hardware_config.py`.
    * If the photo is blurry, adjust `CAM_LENS_POSITION` (higher = focus closer).
    * Keep the cyan band **narrower** than the real line (`LINE_HALF_WIDTH_PX`), and keep lines a few mm away from the strip's ends.
    * Optional: set `ROI` to a fixed `(top, bottom, left, right)` box and `LINE_ORIENTATION` to `"horizontal"`/`"vertical"` if the automatic finding ever picks the wrong area.

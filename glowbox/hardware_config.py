@@ -77,3 +77,12 @@ CAL_FILE = "calibration.json"
 READINGS_CSV = "readings.csv"
 BENCH_CSV = "bench.csv"
 SAVE_PHOTOS = True
+
+# ---------------- Per-setup overrides ----------------
+# camera_test.py --apply writes tuned values (e.g. exposure) to local_settings.py next to
+# this file. That file is NOT in git, so tuning on the Pi never conflicts with git pull.
+# Delete local_settings.py to go back to the values above.
+try:
+    from local_settings import *  # noqa: F401,F403
+except ImportError:
+    pass

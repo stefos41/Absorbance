@@ -3,3 +3,4 @@ __pycache__/
 glowbox/glowbox_data/
 .venv/
 .DS_Store
+glowbox/local_settings.py

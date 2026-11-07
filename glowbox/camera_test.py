@@ -7,6 +7,7 @@ Run with a strip (or white paper) in the holder and the box closed:
     python3 camera_test.py            # tests the mode set in hardware_config.CAM_MODE
     python3 camera_test.py rgb        # force the fallback (processed colour) mode
     python3 camera_test.py raw        # force raw mode
+    python3 camera_test.py --apply    # also SAVE the suggested exposure/gain (local_settings.py)
 
 Paste the full output to whoever is helping you if anything fails.
 """
@@ -29,12 +30,31 @@ def report(status, step, detail=""):
     print(f"[{status:4}] {step}" + (f"\n        {detail}" if detail else ""))
 
 
+def apply_settings(updates):
+    """Merge updates into glowbox/local_settings.py (not tracked by git)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_settings.py")
+    current = {}
+    if os.path.exists(path):
+        exec(open(path).read(), {}, current)
+    current.update(updates)
+    with open(path, "w") as f:
+        f.write("# Written by camera_test.py --apply on " + storage.timestamp() + "\n")
+        f.write("# Overrides hardware_config.py on this Pi only. Delete this file to undo.\n")
+        for k, v in current.items():
+            f.write(f"{k} = {v!r}\n")
+    return path
+
+
 def stats(img):
     return float(img.mean()), float(np.percentile(img, 99)), float(img.max())
 
 
 def main():
-    mode = sys.argv[1] if len(sys.argv) > 1 else None
+    args = sys.argv[1:]
+    apply = "--apply" in args
+    modes = [a for a in args if a in ("raw", "rgb", "auto")]
+    mode = modes[0] if modes else None
+    suggestion = None
     print("=== GlowBox camera test ===")
 
     # 1. picamera2 installed?
@@ -153,19 +173,23 @@ def main():
             sat_level = cfg.SATURATION_FRACTION * cam.full_scale
             sat_pct = 100 * float(np.mean(lit[y0:y1, x0:x1] >= sat_level))
             if sat:
-                # aim the brightest unsaturated part (99th percentile) at ~75% of full scale
-                p99 = float(np.percentile(lit_minus_dark[y0:y1, x0:x1], 99))
-                scale = min(0.75 * cam.full_scale / max(p99, 1.0), 0.8) if sat_pct > 1 else 0.8
+                # paper level (80th percentile) is still measurable: aim it at ~40%,
+                # which keeps hotspots up to ~2x brighter than the paper below the maximum
+                scale = min(40 / max(pct, 1.0), 0.8)
+                new_exp = max(int(exp * scale), 1000)
+                suggestion = {"CAM_EXPOSURE_US": new_exp, "CAM_GAIN": gain}
                 report("WARN", "exposure: TOO BRIGHT (saturated pixels on the strip)",
                        f"paper ~{pct:.0f}% of full scale, {sat_pct:.2f}% of strip pixels maxed out "
-                       f"-> try CAM_EXPOSURE_US = {int(exp * scale)}"
+                       f"-> try CAM_EXPOSURE_US = {new_exp}"
                        + ("  (bright hotspots: more even LED light would help)" if sat_pct < 5 and pct < 60 else ""))
             elif pct < 30 or pct > 85:
-                factor = 60 / max(pct, 0.5)
+                factor = 50 / max(pct, 0.5)
                 new_exp, new_gain = exp * factor, gain
                 while new_exp > 300_000 and new_gain < 8:
                     new_exp, new_gain = new_exp / 2, new_gain * 2
-                tip = f"-> try CAM_EXPOSURE_US = {int(new_exp)}" + (
+                new_exp = int(new_exp)
+                suggestion = {"CAM_EXPOSURE_US": new_exp, "CAM_GAIN": float(new_gain)}
+                tip = f"-> try CAM_EXPOSURE_US = {new_exp}" + (
                     f" and CAM_GAIN = {new_gain:.1f}" if new_gain != gain else "")
                 if new_exp > 1_000_000:
                     tip += "  (that is very long: better to aim the LEDs at the strip and add more LEDs)"
@@ -200,6 +224,14 @@ def main():
     finally:
         cam.close()
         excite.off()
+
+    if suggestion:
+        if apply:
+            path = apply_settings(suggestion)
+            print(f"\n>>> Saved {suggestion} to {path}")
+            print(">>> Run  python3 camera_test.py  again to check it.")
+        else:
+            print("\n>>> To save the suggested settings automatically, run:  python3 camera_test.py --apply")
 
     fails = sum(1 for s, _ in RESULTS if s == "FAIL")
     warns = sum(1 for s, _ in RESULTS if s == "WARN")
