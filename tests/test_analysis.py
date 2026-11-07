@@ -10,7 +10,7 @@ rng = np.random.default_rng(0)
 H, W, FS, BLACK = 648, 1152, 1023, 64.0
 
 
-def strip_image(line_abs, layout="tall", paper=500.0, line_frac=0.3, glare=False, grad=True):
+def strip_image(line_abs, layout="tall", paper=500.0, line_frac=0.3, glare=False, grad=True, uneven=False):
     """Dark background, a bright strip, a dark line across it. Returns (sample, dark, truth)."""
     img = np.zeros((H, W))
     if layout == "tall":                                 # strip up-down, line left-right
@@ -21,6 +21,10 @@ def strip_image(line_abs, layout="tall", paper=500.0, line_frac=0.3, glare=False
     if grad:                                             # uneven lighting along the strip
         g = np.linspace(0.85, 1.15, strip.shape[0 if layout == "tall" else 1])
         strip *= g[:, None] if layout == "tall" else g[None, :]
+    if uneven:                                           # bright ends, dim middle (LED hotspots)
+        n = strip.shape[0 if layout == "tall" else 1]
+        u = 0.4 + 0.6 * np.abs(np.linspace(-1, 1, n)) ** 1.5
+        strip *= u[:, None] if layout == "tall" else u[None, :]
     if layout == "tall":
         c = int(line_frac * strip.shape[0]); strip[c-5:c+6, :] *= 10 ** -line_abs
     else:
@@ -45,6 +49,17 @@ for layout in ("tall", "wide"):
             fails += not ok
             print(f"true={true:.3f}  measured={r['absorbance'] if r['absorbance'] is None else round(r['absorbance'], 4)}"
                   f"  line runs {r['orientation']}  {r['status']}  {'ok' if ok else 'MISMATCH'}")
+
+for layout in ("tall", "wide"):
+    print(f"--- {layout} strip, uneven light + glare")
+    for true in [0.0, 0.05, 0.3]:
+        r = analysis.analyze(*strip_image(true, layout, glare=True, uneven=True, paper=600), cfg, FS)
+        sp = r["strip"]["strip_px"] if r["strip"] else None
+        whole = sp is not None and ((sp[1] - sp[0]) > 0.7 * H if layout == "tall" else (sp[3] - sp[2]) > 0.45 * W)
+        ok = r["status"] == "OK" and whole and abs(r["absorbance"] - true) < 0.01 + 0.03 * true
+        fails += not ok
+        print(f"true={true:.3f} measured={r['absorbance'] if r['absorbance'] is None else round(r['absorbance'], 4)}"
+              f" whole strip found={whole} {r['status']} {'ok' if ok else 'MISMATCH'}")
 
 blanks = [analysis.analyze(*strip_image(0.0, "wide"), cfg, FS)["absorbance"] for _ in range(10)]
 cal = analysis.compute_threshold(blanks, cfg.CAL_K_SIGMA, cfg.CAL_MIN_DELTA)

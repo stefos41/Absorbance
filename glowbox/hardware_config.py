@@ -52,6 +52,7 @@ LINE_ORIENTATION = "auto"
 # Auto-ROI tuning (rarely needs changing)
 AUTO_MIN_AREA_FRAC = 0.01     # strip must cover at least 1% of the image
 AUTO_MIN_CONTRAST = 8         # strip must be at least this much brighter than the background (raw units)
+AUTO_JOIN_FRAC = 0.30         # parts of the strip down to 30% of its brightness still count (uneven light)
 AUTO_MARGIN_ACROSS = 0.20     # trim 20% off each long edge of the strip (blurry edges)
 AUTO_MARGIN_ALONG = 0.04      # trim 4% off each short end (keep lines near the ends)
 

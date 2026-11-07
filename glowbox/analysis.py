@@ -111,7 +111,18 @@ def find_strip(img, cfg):
         ignore |= _shift_or(spot, 2)
     else:
         return None
-    comps = comps[:1] + comps[1:] + glare
+
+    # Uneven lighting can leave part of the strip dimmer than the threshold, splitting it.
+    # Re-threshold relative to this strip's own brightness so the dimmer parts join it.
+    _, y0, y1, x0, x1 = comps[0]
+    box = small[y0:y1, x0:x1]
+    strip_level = float(np.median(box[box > t])) if np.any(box > t) else t
+    t2 = lo + cfg.AUTO_JOIN_FRAC * (strip_level - lo)
+    if t2 < t:
+        joined = _components(_close((small > t2) & ~ignore, 3))
+        if joined and joined[0][0] >= comps[0][0]:
+            comps = joined
+    comps = comps + glare
 
     _, y0, y1, x0, x1 = comps[0]
     sy0, sy1, sx0, sx1 = y0 * f, y1 * f, x0 * f, x1 * f
