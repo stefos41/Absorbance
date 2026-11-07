@@ -17,6 +17,8 @@ LCD_DATA = [12, 13, 19, 26]   # D4, D5, D6, D7  (LCD R/W pin MUST be wired to GN
 # ---------------- Button behaviour ----------------
 DEBOUNCE_S = 0.05         # ignore contact bounce shorter than this
 HOLD_FOR_CAL_S = 3.0      # hold the button this long to enter calibration mode
+HOLD_FOR_SHUTDOWN_S = 10.0 # hold this long to shut the Pi down safely
+ENABLE_HOLD_SHUTDOWN = True
 RESULT_SHOW_S = 1.5       # how long the red LED flashes after a reading
 KEEP_RESULT_ON_LCD = True # result stays on the LCD until the next button press
                           # (False = go back to "GLOWBOX READY" after each reading)

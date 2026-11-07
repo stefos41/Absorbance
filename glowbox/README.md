@@ -71,6 +71,7 @@ Then: `cd ~/Absorbance/glowbox`. Later updates: `git pull`.
 4. **Marker test:** type labels like `blue_1`, `blue_1/2`, `blue_1/4`, `blank` for each strip. Results go to `glowbox_data/bench.csv`, which you can open in Excel/Sheets to chart absorbance against dilution.
 5. **Main program:** `python3 glowbox.py`
    * **Hold the button 3 s** → calibration. Insert a blank strip and press, 10 times (hold again to finish early after ≥3).
+   * **Hold the button 10 s** → safe shutdown: after 3 s the LCD shows `Release: CALIB. / Hold 10s: OFF`, after 10 s `Release to SHUT DOWN` (red LED on). Release, wait ~20 s until the Pi's green light stops, then unplug. (Turn off with `ENABLE_HOLD_SHUTDOWN = False`.)
    * **Short press** → reads the strip. The LCD shows e.g. `A=0.142 POS` with the threshold and reading number, and **keeps showing it until the next press**, which starts the next reading. (Set `KEEP_RESULT_ON_LCD = False` to return to `GLOWBOX READY` after each reading.)
 
 ## 5. Optional: start automatically at power-on
@@ -120,6 +121,8 @@ Re-run calibration after changing modes: the numbers are not interchangeable.
 | `TOO BRIGHT` / `TOO DARK` | Exposure needs adjusting (see step 4.3) |
 | `NO STRIP` | No strip found: check it's under the camera and lit; aim the LEDs |
 | `ERROR` | Something failed; the LEDs are switched off. Press to continue; details are printed in the terminal |
+| `Shutting down` / `unplug in 20 s` | Hold-to-shutdown in progress. Wait ~20 s, then unplug |
+| `SHUTDOWN FAILED` | The user can't run `sudo shutdown` without a password; shut down over SSH instead |
 | `NO CAMERA` | Camera not detected: check the ribbon and `rpicam-hello --list-cameras` |
 
 ## Safety built in

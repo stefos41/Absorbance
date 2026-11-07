@@ -5,10 +5,12 @@ GlowBox - glowbox.py  (main program)
 Short press  : read one strip -> LCD shows absorbance and POS/NEG; the result stays
                on the LCD until the next press, which starts the next reading
 Hold 3 s     : calibration mode -> measure blank strips to set the POS/NEG threshold
+Hold 10 s    : shut the Pi down safely (wait ~20 s, then unplug)
 
 Run:  python3 glowbox.py      (Ctrl+C to quit)
 """
 import signal
+import subprocess
 import sys
 import time
 
@@ -29,19 +31,29 @@ class Hardware:
         self.button = Button(cfg.GPIO_BUTTON, pull_up=True, bounce_time=cfg.DEBOUNCE_S)
         self.lcd = LCD1602(cfg.LCD_RS, cfg.LCD_E, cfg.LCD_DATA)
 
-    def wait_press(self, lcd_hint=None):
-        """Wait for a press. Returns 'short' or 'long' (held >= HOLD_FOR_CAL_S)."""
+    def wait_press(self, lcd_hint=None, shutdown_hint=None):
+        """
+        Wait for a press. Returns 'short', 'long' (held >= HOLD_FOR_CAL_S) or,
+        if shutdown_hint is given, 'shutdown' (held >= HOLD_FOR_SHUTDOWN_S).
+        The LCD hints tell the user what releasing the button will do.
+        """
         self.button.wait_for_press()
         t0 = time.monotonic()
-        announced = False
+        level = "short"
         while self.button.is_pressed:
-            if not announced and time.monotonic() - t0 >= cfg.HOLD_FOR_CAL_S:
-                announced = True
+            held = time.monotonic() - t0
+            if level == "short" and held >= cfg.HOLD_FOR_CAL_S:
+                level = "long"
                 if lcd_hint:
                     self.lcd.show(*lcd_hint)
+            if (level == "long" and shutdown_hint and cfg.ENABLE_HOLD_SHUTDOWN
+                    and held >= cfg.HOLD_FOR_SHUTDOWN_S):
+                level = "shutdown"
+                self.red.on()
+                self.lcd.show(*shutdown_hint)
             time.sleep(0.01)
         time.sleep(cfg.DEBOUNCE_S)
-        return "long" if announced else "short"
+        return level
 
     def safe_off(self):
         self.excite.off()
@@ -132,12 +144,36 @@ def do_calibration(hw, cam):
     return cal
 
 
+def do_shutdown(hw, cam):
+    """Stop everything and power the Pi off. Returns False if the shutdown command failed."""
+    hw.excite.off()
+    hw.green.off()
+    if cam:
+        cam.close()
+    hw.lcd.show("Shutting down", "unplug in 20 s")
+    print("Hold-to-shutdown: shutting down the Pi.")
+    try:
+        rc = subprocess.call(["sudo", "-n", "shutdown", "-h", "now"])
+    except Exception as e:
+        print(f"shutdown failed: {e!r}")
+        rc = 1
+    if rc != 0:
+        hw.red.on()
+        hw.lcd.show("SHUTDOWN FAILED", "see terminal")
+        print("Could not run 'sudo shutdown'. This user needs password-free sudo "
+              "(the default for the first user on Raspberry Pi OS).")
+        return False
+    time.sleep(60)          # the system stops this program during shutdown
+    return True
+
+
 def main():
     # Turn SIGTERM (e.g. from systemd) into a normal exit so 'finally' runs
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
     hw = Hardware()
     cam = None
+    shutting_down = False
     try:
         hw.lcd.show("GLOWBOX", "starting camera")
         try:
@@ -159,8 +195,21 @@ def main():
             if show_ready:
                 hw.lcd.show("GLOWBOX READY", "press=read" if calibration else "hold 3s = CAL")
             # otherwise the last result stays on the LCD until the next press
-            press = hw.wait_press(lcd_hint=("Release for", "CALIBRATION"))
+            press = hw.wait_press(lcd_hint=("Release: CALIB.", "Hold 10s: OFF"),
+                                  shutdown_hint=("Release to", "SHUT DOWN"))
             hw.green.off()
+            if press == "shutdown":
+                cam_closed = cam
+                cam = None
+                if do_shutdown(hw, cam_closed):
+                    shutting_down = True
+                    return
+                hw.wait_press()
+                hw.red.off()
+                show_ready = True
+                from camera_reader import CameraReader
+                cam = CameraReader(cfg, hw.excite)
+                continue
             try:
                 if press == "long":
                     new_cal = do_calibration(hw, cam)
@@ -184,7 +233,10 @@ def main():
     finally:
         if cam:
             cam.close()
-        hw.close()
+        if shutting_down:
+            hw.excite.off()            # leave the "Shutting down" message on the LCD
+        else:
+            hw.close()
 
 
 if __name__ == "__main__":
