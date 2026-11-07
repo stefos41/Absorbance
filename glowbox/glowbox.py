@@ -2,7 +2,8 @@
 """
 GlowBox - glowbox.py  (main program)
 
-Short press  : read one strip -> LCD shows absorbance and POS/NEG
+Short press  : read one strip -> LCD shows absorbance and POS/NEG; the result stays
+               on the LCD until the next press, which starts the next reading
 Hold 3 s     : calibration mode -> measure blank strips to set the POS/NEG threshold
 
 Run:  python3 glowbox.py      (Ctrl+C to quit)
@@ -88,7 +89,7 @@ def do_reading(hw, cam, calibration, count):
     else:
         a = result["absorbance"]
         hw.lcd.show(f"A={a:.3f} {v}",
-                    f"thr={calibration['threshold']:.3f}" if calibration else "NO CAL:hold 3s")
+                    f"thr={calibration['threshold']:.3f} #{count}" if calibration else "NO CAL:hold 3s")
         print(f"[{count}] A={a:.4f} {v}  line={result['line_level']:.1f} "
               f"paper={result['paper_level']:.1f} pos={result['line_pos']:.2f}")
 
@@ -152,9 +153,12 @@ def main():
 
         calibration = storage.load_calibration(cfg)
         count = 0
+        show_ready = True
         while True:
             hw.green.on()
-            hw.lcd.show("GLOWBOX READY", "press=read" if calibration else "hold 3s = CAL")
+            if show_ready:
+                hw.lcd.show("GLOWBOX READY", "press=read" if calibration else "hold 3s = CAL")
+            # otherwise the last result stays on the LCD until the next press
             press = hw.wait_press(lcd_hint=("Release for", "CALIBRATION"))
             hw.green.off()
             try:
@@ -162,9 +166,11 @@ def main():
                     new_cal = do_calibration(hw, cam)
                     if new_cal:
                         calibration = new_cal
+                    show_ready = True
                 else:
                     count += 1
                     do_reading(hw, cam, calibration, count)
+                    show_ready = not cfg.KEEP_RESULT_ON_LCD
             except Exception as e:
                 hw.safe_off()                    # LEDs off immediately on any error
                 hw.red.on()
@@ -172,6 +178,7 @@ def main():
                 print(f"ERROR: {e!r}")
                 hw.wait_press()
                 hw.red.off()
+                show_ready = True
     except KeyboardInterrupt:
         print("\nStopped.")
     finally:

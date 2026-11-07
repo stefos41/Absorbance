@@ -71,7 +71,7 @@ Then: `cd ~/Absorbance/glowbox`. Later updates: `git pull`.
 4. **Marker test:** type labels like `blue_1`, `blue_1/2`, `blue_1/4`, `blank` for each strip. Results go to `glowbox_data/bench.csv`, which you can open in Excel/Sheets to chart absorbance against dilution.
 5. **Main program:** `python3 glowbox.py`
    * **Hold the button 3 s** → calibration. Insert a blank strip and press, 10 times (hold again to finish early after ≥3).
-   * **Short press** → reads the strip. The LCD shows e.g. `A=0.142 POS` and the threshold.
+   * **Short press** → reads the strip. The LCD shows e.g. `A=0.142 POS` with the threshold and reading number, and **keeps showing it until the next press**, which starts the next reading. (Set `KEEP_RESULT_ON_LCD = False` to return to `GLOWBOX READY` after each reading.)
 
 ## 5. Optional: start automatically at power-on
 
