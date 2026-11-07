@@ -64,7 +64,8 @@ def fmt(x, digits=4):
 
 
 def save_debug_image(cfg, red_image, result, path):
-    """Grey picture of the red channel with the ROI (yellow) and found line (cyan) drawn."""
+    """Grey picture of the red channel. Yellow = measuring box, cyan = line found,
+    magenta = whole strip, red = other bright spots (e.g. an LED visible to the camera)."""
     from PIL import Image, ImageDraw
 
     img = np.asarray(red_image, dtype=np.float64)
@@ -73,13 +74,23 @@ def save_debug_image(cfg, red_image, result, path):
     pic = Image.fromarray(scaled).convert("RGB")
     draw = ImageDraw.Draw(pic)
 
+    strip = result.get("strip")
+    if strip:
+        sy0, sy1, sx0, sx1 = strip["strip_px"]
+        draw.rectangle([sx0, sy0, sx1 - 1, sy1 - 1], outline=(255, 0, 255), width=1)   # whole strip
+        for oy0, oy1, ox0, ox1, _ in strip["others"]:
+            draw.rectangle([ox0, oy0, ox1 - 1, oy1 - 1], outline=(255, 60, 60), width=2)  # other bright spots
+
+    if result.get("roi_px") is None:
+        pic.save(path)
+        return
     y0, y1, x0, x1 = result["roi_px"]
     draw.rectangle([x0, y0, x1 - 1, y1 - 1], outline=(255, 220, 0), width=2)
 
     c = result.get("line_index")
     if c is not None:
         hw = cfg.LINE_HALF_WIDTH_PX
-        if cfg.LINE_ORIENTATION == "horizontal":
+        if result.get("orientation") == "horizontal":
             draw.rectangle([x0, y0 + c - hw, x1 - 1, y0 + c + hw], outline=(0, 220, 255), width=1)
         else:
             draw.rectangle([x0 + c - hw, y0, x0 + c + hw, y1 - 1], outline=(0, 220, 255), width=1)

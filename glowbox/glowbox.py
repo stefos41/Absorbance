@@ -58,7 +58,7 @@ class Hardware:
 
 
 def short_status(status):
-    return {"TOO_DARK": "TOO DARK", "TOO_BRIGHT": "TOO BRIGHT"}.get(status, status)
+    return {"TOO_DARK": "TOO DARK", "TOO_BRIGHT": "TOO BRIGHT", "NO_STRIP": "NO STRIP"}.get(status, status)
 
 
 def do_reading(hw, cam, calibration, count):
@@ -82,7 +82,8 @@ def do_reading(hw, cam, calibration, count):
     })
 
     if result["status"] != "OK":
-        hw.lcd.show(short_status(result["status"]), "check exposure")
+        hw.lcd.show(short_status(result["status"]),
+                    "check strip/LED" if result["status"] == "NO_STRIP" else "check exposure")
         print(f"[{count}] {result['status']} paper_level={result['paper_level']}")
     else:
         a = result["absorbance"]

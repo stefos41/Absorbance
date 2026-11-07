@@ -12,5 +12,8 @@ def init(self, *a, **k):
 gpiozero.DigitalOutputDevice.__init__ = init
 if "broken" in sys.argv: picamera2.STATE["raw_broken"] = True
 if "lag6" in sys.argv: picamera2.STATE["lag"] = 6
+if "wide" in sys.argv: picamera2.STATE["layout"] = "strip_horizontal"
+if "glare" in sys.argv: picamera2.STATE["glare"] = True
+if "dim" in sys.argv: picamera2.STATE["paper"] = 12.0
 sys.argv = ["camera_test.py"] + [a for a in sys.argv[1:] if a in ("rgb", "raw")]
 import camera_test; camera_test.main()

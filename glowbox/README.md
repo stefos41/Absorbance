@@ -61,11 +61,12 @@ Then: `cd ~/Absorbance/glowbox`. Later updates: `git pull`.
 
 1. **Wiring test:** `python3 system_test.py`. Every part should respond. Turn the LCD contrast pot until text is crisp.
 2. **Camera test:** put a strip or white paper in the holder, close the box, run `python3 camera_test.py`. Fix any WARN/FAIL using the hint it prints. If the camera won't start, try `python3 camera_test.py rgb`; if that works, set `CAM_MODE = "rgb"` in `hardware_config.py`.
-3. **Exposure and ROI:** put a strip with a marker line in the holder, close the box, run `python3 bench_measure.py`, then:
-   * Type `roi` and open the saved `glowbox_data/photos/roi_debug_*.png`. The **yellow box** must cover only the strip's reading window, and the **cyan band** should sit on the line. Adjust `ROI` (and `LINE_ORIENTATION` if your line runs up-down in the picture) in `hardware_config.py`.
-   * Check the printed **paper level**. Aim for 40–80% of full scale. If it says TOO BRIGHT, lower `CAM_EXPOSURE_US`. If TOO DARK, raise it.
+3. **Exposure and strip finding:** put a strip with a marker line in the holder (either direction is fine), close the box, run `python3 bench_measure.py`, then:
+   * Type `roi` and open the saved `glowbox_data/photos/roi_debug_*.png`. The code finds the strip by itself: **magenta** = the strip it found, **yellow** = the measuring box, **cyan** = the line it found, **red** = other bright spots (usually an LED the camera can see; shield or re-aim it).
+   * Check the printed **paper level**. Aim for 40–80% of full scale. TOO BRIGHT → lower `CAM_EXPOSURE_US`; TOO DARK → raise it (`camera_test.py` suggests values).
    * If the photo is blurry, adjust `CAM_LENS_POSITION` (higher = focus closer).
-   * Make `LINE_HALF_WIDTH_PX` small enough that the cyan band is **narrower** than the real line.
+   * Keep the cyan band **narrower** than the real line (`LINE_HALF_WIDTH_PX`), and keep lines a few mm away from the strip's ends.
+   * Optional: set `ROI` to a fixed `(top, bottom, left, right)` box and `LINE_ORIENTATION` to `"horizontal"`/`"vertical"` if the automatic finding ever picks the wrong area.
 4. **Marker test:** type labels like `blue_1`, `blue_1/2`, `blue_1/4`, `blank` for each strip. Results go to `glowbox_data/bench.csv`, which you can open in Excel/Sheets to chart absorbance against dilution.
 5. **Main program:** `python3 glowbox.py`
    * **Hold the button 3 s** → calibration. Insert a blank strip and press, 10 times (hold again to finish early after ≥3).
@@ -115,7 +116,8 @@ Re-run calibration after changing modes: the numbers are not interchangeable.
 | `A=0.142 POS` | Absorbance above the calibrated threshold |
 | `A=0.003 NEG` | Below the threshold |
 | `A=... ?` / `NO CAL` | No calibration yet. Hold 3 s to calibrate |
-| `TOO BRIGHT` / `TOO DARK` | Exposure or ROI needs adjusting (see step 4.3) |
+| `TOO BRIGHT` / `TOO DARK` | Exposure needs adjusting (see step 4.3) |
+| `NO STRIP` | No strip found: check it's under the camera and lit; aim the LEDs |
 | `ERROR` | Something failed; the LEDs are switched off. Press to continue; details are printed in the terminal |
 | `NO CAMERA` | Camera not detected: check the ribbon and `rpicam-hello --list-cameras` |
 

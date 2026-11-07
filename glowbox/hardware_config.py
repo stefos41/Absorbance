@@ -27,9 +27,9 @@ LED_MAX_ON_S = 10.0       # watchdog: LEDs are forced off after this many second
 # "auto" = use raw sensor data if it works, otherwise fall back to the normal colour image.
 # "raw"  = raw only (most accurate).  "rgb" = normal colour image only (most robust).
 CAM_MODE = "auto"
-# Start LOW and raise only if readings say "TOO DARK". A white strip under red LEDs is bright.
-CAM_EXPOSURE_US = 20_000  # 20 ms
-CAM_GAIN = 1.0
+# camera_test.py tells you if these need changing (and suggests values).
+CAM_EXPOSURE_US = 100_000  # 100 ms
+CAM_GAIN = 4.0
 CAM_LENS_POSITION = 6.5   # dioptres; 6.5 ~= 15 cm. Tune with bench_measure.py if blurry.
 CAM_RAW_SIZE = (2304, 1296)   # binned sensor mode: fast, low noise
 FLUSH_FRAMES = 4          # frames thrown away after every LED on/off change
@@ -37,15 +37,23 @@ N_FRAMES = 3              # frames averaged per measurement
 N_DARK_FRAMES = 3         # frames averaged for the DARK (LEDs off) image
 
 # ---------------- Strip / line geometry ----------------
-# Region of interest (ROI) as fractions of the image: (top, bottom, left, right).
-# It should cover the strip's reading window ONLY (no box walls, no holder edges).
-# Use:  python3 bench_measure.py   then type  roi   to save a picture with this box drawn.
-ROI = (0.15, 0.85, 0.40, 0.60)
+# Where to measure.
+#   ROI = "auto"  -> the code finds the strip (the largest bright area) in every photo.
+#   ROI = (top, bottom, left, right) as fractions of the image -> fixed box instead.
+# Use camera_test.py or "roi" in bench_measure.py to see the box it uses (yellow).
+ROI = "auto"
 
-# "horizontal" = the coloured line runs left-right across the image
-#               (strip lies with its long side going up-down in the picture).
-# "vertical"   = the line runs up-down in the image.
-LINE_ORIENTATION = "horizontal"
+# Which way the coloured LINE runs in the camera image.
+#   "auto"       -> decided from the strip's shape: a strip lying left-right has
+#                   lines running up-down, and vice versa (true for test strips).
+#   "horizontal" -> line runs left-right.   "vertical" -> line runs up-down.
+LINE_ORIENTATION = "auto"
+
+# Auto-ROI tuning (rarely needs changing)
+AUTO_MIN_AREA_FRAC = 0.01     # strip must cover at least 1% of the image
+AUTO_MIN_CONTRAST = 8         # strip must be at least this much brighter than the background (raw units)
+AUTO_MARGIN_ACROSS = 0.20     # trim 20% off each long edge of the strip (blurry edges)
+AUTO_MARGIN_ALONG = 0.04      # trim 4% off each short end (keep lines near the ends)
 
 # Sizes below are in red-channel pixels (about 0.17 mm each at 15 cm).
 LINE_HALF_WIDTH_PX = 2    # half-width of the measured line band. Keep the band (2*this+1) NARROWER than the real line

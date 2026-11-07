@@ -88,51 +88,86 @@ def main():
                f"mean={dm:.1f} p99={d99:.1f} max={dmax:.1f} size={dark.shape[1]}x{dark.shape[0]}"
                + ("" if d99 < 0.2 * cam.full_scale else "  -> light is leaking into the box"))
 
-        # 6. LED sync: frames straight after switching the LEDs on, no flushing
+        # 6. LEDs on: keep every frame right after switching on (no flushing) to check timing
         cam.picam2.capture_request().release()
-        seq = []
+        frames = []
         try:
             cam.leds.on()
             t0 = time.monotonic()
             for _ in range(10):
-                seq.append(float(cam._red_frame().mean()))
+                frames.append(cam._red_frame())
             lit = cam._grab(cfg.N_FRAMES, flush=False)
             elapsed = time.monotonic() - t0
         finally:
             cam.leds.off()
-        lm, l99, lmax = stats(lit)
-        final = seq[-1] - dm
-        print(f"        frame means after LED on: {[round(v, 1) for v in seq]}  ({elapsed:.1f} s)")
-        if final <= max(5.0, 0.02 * cam.full_scale):
-            report("FAIL", "LEDs make no visible difference",
-                   "check LED wiring/5 V rail/GND bond (run system_test.py), LED aim, ROI on the strip")
+        lit_minus_dark = lit - dark
+
+        # 7. find the strip
+        roi_px, orientation, strip = analysis.resolve_roi(lit, dark, cfg)
+        if roi_px is None:
+            report("FAIL", "no strip found in the picture",
+                   "is the strip under the camera and lit? aim the LEDs at it; "
+                   "if the picture is very dark, raise CAM_EXPOSURE_US")
+            region = (0, lit.shape[0], 0, lit.shape[1])
         else:
-            first_ok = next((i for i, v in enumerate(seq) if v - dm >= 0.97 * final), len(seq))
+            region = strip["strip_px"] if strip else roi_px
+            if strip:
+                sy0, sy1, sx0, sx1 = strip["strip_px"]
+                h, w = lit.shape
+                report("PASS", "strip found",
+                       f"strip at x {100*sx0/w:.0f}-{100*sx1/w:.0f}%, y {100*sy0/h:.0f}-{100*sy1/h:.0f}% of the image; "
+                       f"line runs {'left-right' if orientation == 'horizontal' else 'up-down'}")
+                bright = [o for o in strip["others"] if o[4] > 0.5 * cam.full_scale]
+                if bright:
+                    report("WARN", f"{len(bright)} bright spot(s) outside the strip",
+                           "probably an LED (or its reflection) visible to the camera -> angle it away "
+                           "or shield it with black card (red boxes in the camtest_roi picture)")
+                else:
+                    report("PASS", "no LED glare visible")
+
+        # 8. LED timing, measured on the strip only
+        ry0, ry1, rx0, rx1 = region
+        seq = [float(fr[ry0:ry1, rx0:rx1].mean()) for fr in frames]
+        base = float(dark[ry0:ry1, rx0:rx1].mean())
+        final = seq[-1] - base
+        print(f"        strip brightness after LED on: {[round(v, 1) for v in seq]}  ({elapsed:.1f} s)")
+        if final <= max(5.0, 0.02 * cam.full_scale):
+            report("FAIL", "LEDs make almost no difference on the strip",
+                   "aim the LEDs at the strip (live preview: pinctrl set 17 op dh; rpicam-hello -t 0), "
+                   "move them closer, add LEDs, or raise CAM_EXPOSURE_US / CAM_GAIN")
+        else:
+            first_ok = next((i for i, v in enumerate(seq) if v - base >= 0.97 * final), len(seq))
             need = first_ok + 1
             ok = need <= cfg.FLUSH_FRAMES
             report("PASS" if ok else "WARN", "LED / frame timing",
                    f"first fully-lit frame = #{first_ok}; FLUSH_FRAMES={cfg.FLUSH_FRAMES}"
                    + ("" if ok else f"  -> set FLUSH_FRAMES = {need + 1} in hardware_config.py"))
 
-        # 7. exposure level
-        lit_minus_dark = lit - dark
-        y0, y1, x0, x1 = analysis.roi_bounds(lit.shape, cfg.ROI)
-        roi = lit_minus_dark[y0:y1, x0:x1]
-        paper = float(np.percentile(roi, 80))
-        sat = float(lit[y0:y1, x0:x1].max()) >= cfg.SATURATION_FRACTION * cam.full_scale
-        pct = 100 * paper / cam.full_scale
-        if sat:
-            report("WARN", "exposure: TOO BRIGHT (saturated pixels in ROI)",
-                   f"paper ~{pct:.0f}% of full scale -> lower CAM_EXPOSURE_US (now {cfg.CAM_EXPOSURE_US})")
-        elif pct < 25:
-            new = int(cfg.CAM_EXPOSURE_US * 55 / max(pct, 1))
-            report("WARN", "exposure: low", f"paper ~{pct:.0f}% of full scale -> try CAM_EXPOSURE_US = {new}")
-        elif pct > 85:
-            report("WARN", "exposure: high", f"paper ~{pct:.0f}% -> lower CAM_EXPOSURE_US a little")
-        else:
-            report("PASS", "exposure", f"paper ~{pct:.0f}% of full scale (target 40-80%)")
+        # 9. exposure level on the measuring box
+        if roi_px is not None:
+            y0, y1, x0, x1 = roi_px
+            paper = float(np.percentile(lit_minus_dark[y0:y1, x0:x1], 80))
+            sat = float(lit[y0:y1, x0:x1].max()) >= cfg.SATURATION_FRACTION * cam.full_scale
+            pct = 100 * paper / cam.full_scale
+            exp, gain = cfg.CAM_EXPOSURE_US, cfg.CAM_GAIN
+            if sat:
+                report("WARN", "exposure: TOO BRIGHT (saturated pixels on the strip)",
+                       f"-> try CAM_EXPOSURE_US = {int(exp * 0.5)}")
+            elif pct < 30 or pct > 85:
+                factor = 60 / max(pct, 0.5)
+                new_exp, new_gain = exp * factor, gain
+                while new_exp > 300_000 and new_gain < 8:
+                    new_exp, new_gain = new_exp / 2, new_gain * 2
+                tip = f"-> try CAM_EXPOSURE_US = {int(new_exp)}" + (
+                    f" and CAM_GAIN = {new_gain:.1f}" if new_gain != gain else "")
+                if new_exp > 1_000_000:
+                    tip += "  (that is very long: better to aim the LEDs at the strip and add more LEDs)"
+                report("WARN", f"exposure: {'low' if pct < 30 else 'high'}",
+                       f"paper ~{pct:.0f}% of full scale (target 40-80%) {tip}")
+            else:
+                report("PASS", "exposure", f"paper ~{pct:.0f}% of full scale (target 40-80%)")
 
-        # 8. repeatability: two quick measurements of the same strip
+        # 10. repeatability: two quick measurements of the same strip
         a1 = analysis.analyze(*cam.measure(), cfg, cam.full_scale)
         a2 = analysis.analyze(*cam.measure(), cfg, cam.full_scale)
         if a1["status"] == "OK" and a2["status"] == "OK":
@@ -143,7 +178,7 @@ def main():
         else:
             report("WARN", "repeat measurement skipped", f"status {a1['status']}, {a2['status']}")
 
-        # 9. save pictures
+        # 11. save pictures
         folder = os.path.join(storage.data_dir(cfg), "photos")
         stamp = storage.file_stamp()
         colour = os.path.join(folder, f"camtest_colour_{stamp}.jpg")
@@ -154,7 +189,7 @@ def main():
             cam.leds.off()
         dbg = os.path.join(folder, f"camtest_roi_{stamp}.png")
         storage.save_debug_image(cfg, lit_minus_dark, a2, dbg)
-        report("PASS", "saved pictures", f"{colour}\n        {dbg}  (yellow = ROI, cyan = line found)")
+        report("PASS", "saved pictures", f"{colour}\n        {dbg}\n        (yellow = measuring box, cyan = line, magenta = strip, red = bright spots)")
     finally:
         cam.close()
         excite.off()
