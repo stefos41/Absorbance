@@ -167,7 +167,7 @@ def main():
         if roi_px is not None:
             y0, y1, x0, x1 = roi_px
             paper = float(np.percentile(lit_minus_dark[y0:y1, x0:x1], 80))
-            sat = float(lit[y0:y1, x0:x1].max()) >= cfg.SATURATION_FRACTION * cam.full_scale
+            sat = float(np.mean(lit[y0:y1, x0:x1] >= cfg.SATURATION_FRACTION * cam.full_scale)) > cfg.SAT_MAX_FRACTION
             pct = 100 * paper / cam.full_scale
             exp, gain = cfg.CAM_EXPOSURE_US, cfg.CAM_GAIN
             sat_level = cfg.SATURATION_FRACTION * cam.full_scale

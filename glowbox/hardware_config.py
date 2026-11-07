@@ -73,7 +73,9 @@ BG_MAX_MISMATCH = 0.30
 
 # ---------------- Image quality checks ----------------
 MIN_PAPER_LEVEL = 30      # paper brightness (above dark) below this -> "TOO DARK"
-SATURATION_FRACTION = 0.92  # any ROI pixel above this fraction of full scale -> "TOO BRIGHT"
+SATURATION_FRACTION = 0.92  # a pixel above this fraction of full scale counts as maxed out
+SAT_MAX_FRACTION = 0.02     # "TOO BRIGHT" only if >2% of the measured area is maxed out;
+                            # fewer maxed-out pixels (glints) are simply left out
 
 # ---------------- Calibration / decision ----------------
 CAL_N_BLANKS = 10         # blank (no line) strips measured during calibration

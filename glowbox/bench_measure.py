@@ -35,6 +35,9 @@ def main():
             r = analysis.analyze(sample, dark, cfg, cam.full_scale)
 
             print(f"status={r['status']}")
+            if r.get("sat_frac"):
+                print(f"maxed-out pixels in measured area = {100 * r['sat_frac']:.2f}% "
+                      f"(left out; TOO BRIGHT above {100 * cfg.SAT_MAX_FRACTION:.0f}%)")
             if r["paper_level"] is not None:
                 pct = 100 * r["paper_level"] / cam.full_scale
                 print(f"paper level = {r['paper_level']:.1f} ({pct:.0f}% of full scale; aim for 40-80%)")

@@ -77,6 +77,24 @@ r = analysis.analyze(*strip_image(0.0, "tall", holder=True), cfg, FS)
 print(f"(info) both-sides check alone, no search limit: blank reads {r['absorbance']:.4f}")
 cfg.LINE_SEARCH = _ls
 
+print("--- shiny glints (a few maxed-out pixels) and real overexposure")
+def with_glints(sample, where, n=40):
+    sample = sample.copy()
+    ys = rng.integers(where[0], where[1], n); xs = rng.integers(int(.42*W), int(.58*W), n)
+    for y, x in zip(ys, xs):
+        sample[y:y+2, x:x+2] = FS                         # 2x2 glint spots
+    return sample
+s_, d_ = strip_image(0.7, "tall", line_frac=0.4, holder=True)
+cy = int(.10*H + 0.4 * int(.80*H))                        # line row in the image
+for name, where in (("glints on the dark line", (cy-4, cy+5)), ("glints on the holder", (int(.10*H), int(.18*H)))):
+    r = analysis.analyze(with_glints(s_, where), d_, cfg, FS)
+    ok = r["status"] == "OK" and abs(r["absorbance"] - 0.7) < 0.03
+    fails += not ok
+    print(f"{name}: {r['status']} A={r['absorbance'] if r['absorbance'] is None else round(r['absorbance'], 4)}"
+          f" maxed-out={100*(r['sat_frac'] or 0):.2f}%  {'ok' if ok else 'MISMATCH'}")
+st = analysis.analyze(*strip_image(0.3, "tall", paper=1100), cfg, FS)["status"]
+print("real overexposure:", st); fails += st != "TOO_BRIGHT"
+
 blanks = [analysis.analyze(*strip_image(0.0, "wide"), cfg, FS)["absorbance"] for _ in range(10)]
 cal = analysis.compute_threshold(blanks, cfg.CAL_K_SIGMA, cfg.CAL_MIN_DELTA)
 print("cal", {k: round(v, 4) if isinstance(v, float) else v for k, v in cal.items()})

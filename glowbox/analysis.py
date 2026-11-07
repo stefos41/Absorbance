@@ -189,7 +189,7 @@ def analyze(sample, dark, cfg, full_scale):
     result = {"status": "OK", "absorbance": None, "line_level": None,
               "paper_level": None, "line_pos": None, "profile": None,
               "line_index": None, "roi_px": None, "orientation": None, "strip": None,
-              "search_idx": None}
+              "search_idx": None, "sat_frac": None}
 
     roi_px, orientation, strip = resolve_roi(sample, dark, cfg)
     if roi_px is None:
@@ -200,16 +200,27 @@ def analyze(sample, dark, cfg, full_scale):
     raw_roi = sample[y0:y1, x0:x1]
     roi = raw_roi - dark[y0:y1, x0:x1]
 
-    # 1) Saturation check on the raw pixels (before dark subtraction)
-    if float(raw_roi.max()) >= cfg.SATURATION_FRACTION * full_scale:
-        result["status"] = "TOO_BRIGHT"
-        return result
+    # 1) Maxed-out (saturated) pixels: leave them out of the measurement, so a few
+    #    glints (shiny ink, cardboard) don't spoil it. Real overexposure is judged
+    #    below, only inside the area actually used for the line.
+    sat = raw_roi >= cfg.SATURATION_FRACTION * full_scale
+    across = 1 if orientation == "horizontal" else 0     # average across the line direction
+    good = (~sat).astype(np.float64)
+    counts = good.sum(axis=across)
+    sums = np.where(sat, 0.0, roi).sum(axis=across)
+    sat_profile = 1.0 - counts / sat.shape[across]       # saturated fraction per position
 
     # 2) Collapse the ROI into a 1-D profile ACROSS the line direction
-    if orientation == "horizontal":
-        profile = roi.mean(axis=1)     # line runs left-right: one value per row
-    else:
-        profile = roi.mean(axis=0)     # line runs up-down: one value per column
+    #    (line runs left-right -> one value per row; up-down -> one value per column)
+    idx = np.arange(len(counts))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        profile = sums / counts
+    valid = counts > 0
+    if not np.any(valid):
+        result["status"] = "TOO_BRIGHT"
+        result["sat_frac"] = 1.0
+        return result
+    profile = np.interp(idx, idx[valid], profile[valid])  # fill fully-saturated positions
     profile = smooth(profile.astype(np.float64), cfg.SMOOTH_PX)
     result["profile"] = profile
 
@@ -243,6 +254,13 @@ def analyze(sample, dark, cfg, full_scale):
         result["status"] = "NO_STRIP"     # search range too small for the line/background widths
         return result
     result["search_idx"] = (lo_c, hi_c)
+    # Overexposure is judged only where the line and its background are measured
+    used = sat_profile[max(lo_c - margin, 0):min(hi_c + margin, n)]
+    sat_frac = float(used.mean()) if used.size else 0.0
+    result["sat_frac"] = sat_frac
+    if sat_frac > getattr(cfg, "SAT_MAX_FRACTION", 0.0):
+        result["status"] = "TOO_BRIGHT"
+        return result
     centres = np.arange(lo_c, hi_c)
     line_means = window_mean(centres - hw, 2 * hw + 1)
     bg_a = window_mean(centres - hw - gap - bgw, bgw)
