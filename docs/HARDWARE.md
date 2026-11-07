@@ -1,6 +1,6 @@
 # GlowBox hardware reference (v1.2, absorbance)
 
-GlowBox lights a test strip with 650 nm red LEDs, photographs it with a Raspberry Pi Camera Module 3 NoIR, and reports the line's absorbance (how much darker the line is than the paper beside it) plus a POS/NEG verdict on a 16x2 LCD. No optical filter is used.
+GlowBox lights a test strip with 650 nm red LEDs, photographs it with a Raspberry Pi Camera Module 3, and reports the line's absorbance (how much darker the line is than the paper beside it) plus a POS/NEG verdict on a 16x2 LCD. No optical filter is used.
 
 ## Bill of materials
 
@@ -8,16 +8,16 @@ GlowBox lights a test strip with 650 nm red LEDs, photographs it with a Raspberr
 |---|---|---|---|
 | Raspberry Pi 4 Model B | 4 GB, Raspberry Pi OS 64-bit | 1 | Main computer |
 | Raspberry Pi 1 Model B+ | same 40-pin header | 1 | Optional GPIO test bench (no camera work) |
-| Pi Camera Module 3 NoIR | IMX708, 15-pin 1 mm ribbon (included) | 1 | Imaging |
-| Red LED | 650 nm, 5 mm | 5 | Strip illumination |
+| Pi Camera Module 3 | IMX708, standard or NoIR (the prototype reports `imx708`, i.e. standard); 15-pin 1 mm ribbon (included) | 1 | Imaging |
+| Red LED | 650 nm, 5 mm, diffused with paper/tissue | 1–5 (prototype: 1) | Strip illumination |
 | N-channel MOSFET | **IRLZ44N** (not IRFZ44N) | 1 | Low-side LED switch |
 | Resistors | 150 Ω ×5, 220 Ω ×2, 330 Ω ×1, 10 kΩ ×1, 100 Ω ×1 | | See below |
 | Status LEDs | standard red + standard green (Vf ≈ 2 V) | 2 | Ready / result / error |
-| Tactile button | 4-leg | 1 | Read / calibrate |
+| Tactile button | 4-leg | 1 | Read / hold 3 s calibrate / hold 10 s shut down |
 | 1602A LCD | 16-pin, HD44780, no I²C backpack | 1 | Display |
 | Potentiometer | 10 kΩ | 1 | LCD contrast |
 | Power | 5.1 V / 3 A USB-C | 1 | Pi 4 + LED rail |
-| Enclosure | 15×15×15 cm, matte black, strip holder | 1 | Light-tight chamber |
+| Enclosure | 15×15×15 cm, matte black; L-shaped strip holder (strip pushed into the corner) | 1 | Light-tight chamber |
 
 ## Power and ground
 
@@ -78,6 +78,7 @@ One resistor per LED, LEDs in parallel.
 
 ## Optics and enclosure
 
+* Prototype setup: one 650 nm LED, diffused, angled at the strip; camera ~15 cm above; strip pushed into an L-shaped cardboard holder. The code skips the first 20% of the strip at the holder end because the holder's edge and shadow look like a line.
 * Reflection geometry: LEDs on two or more walls at 45° pointing at the strip; camera centred in the ceiling ~15 cm above the strip, pointing down.
 * No LED visible from the lens; matte black interior; strip in a fixed holder; cable entries light-trapped.
 * Red 650 nm LEDs read blue/purple/black lines. Red/pink (gold) lines would need green ~525 nm LEDs.

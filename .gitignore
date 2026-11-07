@@ -4,3 +4,14 @@ glowbox/glowbox_data/
 .venv/
 .DS_Store
 glowbox/local_settings.py
+
+# Never publish photos (they can show the surroundings) or secrets
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.env
+.env
+*secret*
+*password*
+wpa_supplicant*.conf
